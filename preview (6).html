@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>PharmaSutom</title>
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --tile: #1f2937;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --blue: #2563eb;
+      --red: #dc2626;
+      --yellow: #facc15;
+      --gray: #374151;
+      --green: #16a34a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(37, 99, 235, 0.25), transparent 35%),
+        linear-gradient(135deg, #020617, #111827);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 22px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 820px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 6vw, 4rem);
+      letter-spacing: 0.08em;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      color: var(--muted);
+    }
+
+    .card {
+      background: rgba(17, 24, 39, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 22px;
+      padding: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.16);
+      color: #bfdbfe;
+      border: 1px solid rgba(96, 165, 250, 0.25);
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      background: var(--blue);
+      color: white;
+      padding: 10px 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .grid {
+      display: grid;
+      gap: 7px;
+      justify-content: center;
+      margin: 22px auto;
+    }
+
+    .row {
+      display: grid;
+      gap: 7px;
+      justify-content: center;
+    }
+
+    .tile {
+      width: min(10vw, 52px);
+      height: min(10vw, 52px);
+      min-width: 32px;
+      min-height: 32px;
+      border: 2px solid var(--gray);
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(1rem, 4vw, 1.7rem);
+      font-weight: 900;
+      text-transform: uppercase;
+      border-radius: 8px;
+      user-select: none;
+    }
+
+    .tile.current {
+      border-color: #60a5fa;
+    }
+
+    .tile.correct {
+      background: var(--red);
+      border-color: var(--red);
+      color: white;
+    }
+
+    .tile.present {
+      background: var(--yellow);
+      border-color: var(--yellow);
+      color: #111827;
+      border-radius: 50%;
+    }
+
+    .tile.absent {
+      background: var(--tile);
+      border-color: var(--tile);
+      color: #64748b;
+    }
+
+    .message {
+      min-height: 32px;
+      text-align: center;
+      font-weight: 700;
+      margin: 10px 0;
+      line-height: 1.5;
+    }
+
+    .message.good {
+      color: #86efac;
+    }
+
+    .message.bad {
+      color: #fca5a5;
+    }
+
+    .keyboard {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .keyrow {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .key {
+      min-width: 32px;
+      height: 44px;
+      padding: 0 10px;
+      border-radius: 9px;
+      background: #334155;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: 800;
+      cursor: pointer;
+      user-select: none;
+      text-transform: uppercase;
+    }
+
+    .key.wide {
+      min-width: 74px;
+      font-size: 0.85rem;
+    }
+
+    .key.correct {
+      background: var(--red);
+    }
+
+    .key.present {
+      background: var(--yellow);
+      color: #111827;
+    }
+
+    .key.absent {
+      background: #111827;
+      color: #475569;
+    }
+
+    .rules {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 14px;
+    }
+
+    .end-summary {
+      text-align: center;
+    }
+
+    .end-title {
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+
+    .share-card {
+      max-width: 380px;
+      margin: 12px auto 0;
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: white;
+    }
+
+    .share-header {
+      font-weight: 900;
+      font-size: 1.1rem;
+    }
+
+    .share-result {
+      margin-top: 4px;
+      font-weight: 800;
+    }
+
+    .share-hint {
+      margin-top: 4px;
+      color: #d1d5db;
+      font-size: 0.9rem;
+    }
+
+    .share-graph {
+      margin-top: 12px;
+      display: inline-block;
+      text-align: left;
+    }
+
+    .share-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin: 4px 0;
+    }
+
+    .share-try {
+      width: 18px;
+      color: #cbd5e1;
+      font-weight: 800;
+    }
+
+    .share-squares {
+      letter-spacing: 2px;
+      font-size: 1.1rem;
+    }
+
+    @media (max-width: 560px) {
+      body {
+        padding: 10px;
+      }
+
+      .card {
+        padding: 13px;
+      }
+
+      .key {
+        min-width: 27px;
+        height: 40px;
+        padding: 0 7px;
+      }
+
+      .key.wide {
+        min-width: 58px;
+      }
+
+      .share-card {
+        max-width: 100%;
+      }
+
+      .share-squares {
+        font-size: 1rem;
+        letter-spacing: 1px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <header>
+      <h1>PHARMASUTOM</h1>
+      <div class="subtitle">Le Sutom version pharmacie hospitalière</div>
+    </header>
+
+    <section class="card">
+      <div class="topbar">
+        <span class="pill" id="hint">Mot du jour</span>
+      </div>
+
+      <div id="board" class="grid"></div>
+
+      <div id="message" class="message"></div>
+
+      <div id="keyboard" class="keyboard"></div>
+
+      <div class="rules">
+        <strong>Règles :</strong> rouge = bonne lettre au bon endroit, jaune = lettre présente ailleurs,
+        gris = lettre absente. Les accents, espaces et tirets sont ignorés. Le mot change chaque jour.
+      </div>
+    </section>
+  </main>
+
+  <script>
+    /*
+      Liste unique :
+      - mots possibles comme solution
+      - mots acceptés comme propositions
+      Pas de stockage local.
+      Pas de fichier externe.
+    */
+    const WORDS = [
+      { word: "ACICLOVIR", hint: "Antiviral" },
+      { word: "ADALIMUMAB", hint: "Anti-TNF alpha" },
+      { word: "ADRENALINE", hint: "Catécholamine" },
+      { word: "ALBUMINE", hint: "Produit dérivé du sang" },
+      { word: "ALLOPURINOL", hint: "Hypouricémiant" },
+      { word: "AMIKACINE", hint: "Aminoside" },
+      { word: "AMIODARONE", hint: "Antiarythmique" },
+      { word: "AMLODIPINE", hint: "Inhibiteur calcique" },
+      { word: "AMOXICILLINE", hint: "Antibiotique bêta-lactamine" },
+      { word: "ANASTROZOLE", hint: "Hormonothérapie" },
+      { word: "ANIDULAFUNGINE", hint: "Échinocandine" },
+      { word: "APIXABAN", hint: "Anticoagulant oral direct" },
+      { word: "APREPITANT", hint: "Antiémétique anti-NK1" },
+      { word: "ASPIRINE", hint: "Antiagrégant / antalgique" },
+      { word: "ATEZOLIZUMAB", hint: "Immunothérapie anti-PD-L1" },
+      { word: "ATORVASTATINE", hint: "Statine" },
+      { word: "AZACITIDINE", hint: "Hypométhylant" },
+      { word: "AZITHROMYCINE", hint: "Macrolide" },
+      { word: "AZTREONAM", hint: "Monobactame" },
+
+      { word: "BEVACIZUMAB", hint: "Anti-VEGF" },
+      { word: "BISOPROLOL", hint: "Bêtabloquant" },
+      { word: "BLEOMYCINE", hint: "Chimiothérapie" },
+      { word: "BORTEZOMIB", hint: "Inhibiteur du protéasome" },
+      { word: "BUDESONIDE", hint: "Corticoïde" },
+      { word: "BUMETANIDE", hint: "Diurétique de l’anse" },
+      { word: "BUSULFAN", hint: "Conditionnement de greffe" },
+
+      { word: "CABAZITAXEL", hint: "Taxane" },
+      { word: "CAPECITABINE", hint: "Prodrogue du 5-FU" },
+      { word: "CARBAMAZEPINE", hint: "Antiépileptique" },
+      { word: "CARBOPLATINE", hint: "Chimiothérapie à base de platine" },
+      { word: "CARFILZOMIB", hint: "Inhibiteur du protéasome" },
+      { word: "CARVEDILOL", hint: "Bêtabloquant" },
+      { word: "CASPOFUNGINE", hint: "Échinocandine" },
+      { word: "CEFAZOLINE", hint: "Céphalosporine de 1re génération" },
+      { word: "CEFEPIME", hint: "Céphalosporine anti-Pseudomonas" },
+      { word: "CEFIXIME", hint: "Céphalosporine orale" },
+      { word: "CEFOTAXIME", hint: "Céphalosporine injectable" },
+      { word: "CEFPODOXIME", hint: "Céphalosporine orale" },
+      { word: "CEFTAROLINE", hint: "Céphalosporine anti-SARM" },
+      { word: "CEFTAZIDIME", hint: "Antibiotique anti-Pseudomonas" },
+      { word: "CEFTRIAXONE", hint: "Céphalosporine injectable" },
+      { word: "CICLOSPORINE", hint: "Immunosuppresseur" },
+      { word: "CIPROFLOXACINE", hint: "Fluoroquinolone" },
+      { word: "CISATRACURIUM", hint: "Curare" },
+      { word: "CISPLATINE", hint: "Chimiothérapie à base de platine" },
+      { word: "CLARITHROMYCINE", hint: "Macrolide" },
+      { word: "CLINDAMYCINE", hint: "Lincosamide" },
+      { word: "CLOBAZAM", hint: "Benzodiazépine" },
+      { word: "CLOMIPRAMINE", hint: "Antidépresseur tricyclique" },
+      { word: "CLOXACILLINE", hint: "Pénicilline M" },
+      { word: "CLOZAPINE", hint: "Antipsychotique" },
+      { word: "COLCHICINE", hint: "Anti-goutteux" },
+      { word: "COLISTINE", hint: "Polymyxine" },
+      { word: "CYCLOPHOSPHAMIDE", hint: "Agent alkylant" },
+      { word: "CYTARABINE", hint: "Antimétabolite" },
+
+      { word: "DABIGATRAN", hint: "Anticoagulant oral direct" },
+      { word: "DACARBAZINE", hint: "Agent alkylant" },
+      { word: "DALTEPARINE", hint: "HBPM" },
+      { word: "DAPTOMYCINE", hint: "Anti-Gram positif" },
+      { word: "DARATUMUMAB", hint: "Anticorps anti-CD38" },
+      { word: "DARBEPOETINE", hint: "Agent stimulant l’érythropoïèse" },
+      { word: "DASATINIB", hint: "Inhibiteur de tyrosine kinase" },
+      { word: "DAUNORUBICINE", hint: "Anthracycline" },
+      { word: "DECITABINE", hint: "Hypométhylant" },
+      { word: "DEXAMETHASONE", hint: "Corticoïde" },
+      { word: "DIAZEPAM", hint: "Benzodiazépine" },
+      { word: "DIGOXINE", hint: "Cardiotonique" },
+      { word: "DOBUTAMINE", hint: "Inotrope" },
+      { word: "DOCETAXEL", hint: "Taxane" },
+      { word: "DOPAMINE", hint: "Catécholamine" },
+      { word: "DOXORUBICINE", hint: "Anthracycline" },
+      { word: "DOXYCYCLINE", hint: "Cycline" },
+      { word: "DULOXETINE", hint: "Antidépresseur" },
+      { word: "DURVALUMAB", hint: "Immunothérapie anti-PD-L1" },
+
+      { word: "EDOXABAN", hint: "Anticoagulant oral direct" },
+      { word: "ENOXAPARINE", hint: "HBPM" },
+      { word: "EPIRUBICINE", hint: "Anthracycline" },
+      { word: "ERTAPENEME", hint: "Carbapénème" },
+      { word: "ESCITALOPRAM", hint: "ISRS" },
+      { word: "ESMOLOL", hint: "Bêtabloquant injectable" },
+      { word: "ESOMEPRAZOLE", hint: "IPP" },
+      { word: "ETOMIDATE", hint: "Hypnotique injectable" },
+      { word: "ETOPOSIDE", hint: "Inhibiteur de topoisomérase" },
+      { word: "EVEROLIMUS", hint: "Inhibiteur mTOR" },
+      { word: "EXEMESTANE", hint: "Hormonothérapie" },
+
+      { word: "FENTANYL", hint: "Opioïde fort" },
+      { word: "FILGRASTIM", hint: "Facteur de croissance" },
+      { word: "FLECAINIDE", hint: "Antiarythmique" },
+      { word: "FLUCONAZOLE", hint: "Antifongique azolé" },
+      { word: "FLUINDIONE", hint: "AVK" },
+      { word: "FLUOROURACILE", hint: "Antimétabolite" },
+      { word: "FLUOXETINE", hint: "ISRS" },
+      { word: "FORMOTEROL", hint: "Bronchodilatateur" },
+      { word: "FOSCARNET", hint: "Antiviral anti-CMV" },
+      { word: "FOSFOMYCINE", hint: "Antibiotique" },
+      { word: "FULVESTRANT", hint: "Hormonothérapie" },
+      { word: "FUROSEMIDE", hint: "Diurétique de l’anse" },
+
+      { word: "GABAPENTINE", hint: "Antiépileptique / antalgique" },
+      { word: "GANCICLOVIR", hint: "Antiviral anti-CMV" },
+      { word: "GEMCITABINE", hint: "Antimétabolite" },
+      { word: "GENTAMICINE", hint: "Aminoside" },
+
+      { word: "HALOPERIDOL", hint: "Antipsychotique" },
+      { word: "HEPARINE", hint: "Anticoagulant injectable" },
+      { word: "HYDROCORTISONE", hint: "Corticoïde" },
+
+      { word: "IBRUTINIB", hint: "Inhibiteur de BTK" },
+      { word: "IBUPROFENE", hint: "AINS" },
+      { word: "IDARUBICINE", hint: "Anthracycline" },
+      { word: "IFOSFAMIDE", hint: "Agent alkylant" },
+      { word: "IMATINIB", hint: "Inhibiteur de tyrosine kinase" },
+      { word: "IMIPENEME", hint: "Carbapénème" },
+      { word: "INFLIXIMAB", hint: "Anti-TNF alpha" },
+      { word: "INSULINE", hint: "Hormone hypoglycémiante" },
+      { word: "IPILIMUMAB", hint: "Immunothérapie anti-CTLA-4" },
+      { word: "IPRATROPIUM", hint: "Bronchodilatateur" },
+      { word: "IRINOTECAN", hint: "Inhibiteur de topoisomérase" },
+      { word: "ISAVUCONAZOLE", hint: "Antifongique azolé" },
+
+      { word: "KETAMINE", hint: "Anesthésique injectable" },
+      { word: "KETOPROFENE", hint: "AINS" },
+
+      { word: "LABETALOL", hint: "Bêtabloquant" },
+      { word: "LACOSAMIDE", hint: "Antiépileptique" },
+      { word: "LACTULOSE", hint: "Laxatif" },
+      { word: "LAMOTRIGINE", hint: "Antiépileptique" },
+      { word: "LANREOTIDE", hint: "Analogue de la somatostatine" },
+      { word: "LENALIDOMIDE", hint: "Immunomodulateur" },
+      { word: "LETROZOLE", hint: "Hormonothérapie" },
+      { word: "LEVETIRACETAM", hint: "Antiépileptique" },
+      { word: "LEVOTHYROXINE", hint: "Hormone thyroïdienne" },
+      { word: "LEVOFLOXACINE", hint: "Fluoroquinolone" },
+      { word: "LIDOCAINE", hint: "Anesthésique local" },
+      { word: "LINEZOLIDE", hint: "Oxazolidinone" },
+      { word: "LOPERAMIDE", hint: "Antidiarrhéique" },
+      { word: "LORAZEPAM", hint: "Benzodiazépine" },
+      { word: "LOSARTAN", hint: "ARA2" },
+
+      { word: "MACROGOL", hint: "Laxatif osmotique" },
+      { word: "MANNITOL", hint: "Diurétique osmotique" },
+      { word: "MELPHALAN", hint: "Agent alkylant" },
+      { word: "MEROPENEME", hint: "Carbapénème" },
+      { word: "METFORMINE", hint: "Antidiabétique oral" },
+      { word: "METHOTREXATE", hint: "Antimétabolite" },
+      { word: "METOCLOPRAMIDE", hint: "Antiémétique / prokinétique" },
+      { word: "METRONIDAZOLE", hint: "Anti-anaérobie" },
+      { word: "MICAFUNGINE", hint: "Échinocandine" },
+      { word: "MIDAZOLAM", hint: "Benzodiazépine" },
+      { word: "MIRTAZAPINE", hint: "Antidépresseur" },
+      { word: "MONTELUKAST", hint: "Antileucotriène" },
+      { word: "MORPHINE", hint: "Antalgique opioïde" },
+      { word: "MOXIFLOXACINE", hint: "Fluoroquinolone" },
+      { word: "MYCOPHENOLATE", hint: "Immunosuppresseur" },
+
+      { word: "NALOXONE", hint: "Antidote opioïde" },
+      { word: "NEFOPAM", hint: "Antalgique non opioïde" },
+      { word: "NEOSTIGMINE", hint: "Antagoniste des curares" },
+      { word: "NICARDIPINE", hint: "Inhibiteur calcique" },
+      { word: "NILOTINIB", hint: "Inhibiteur de tyrosine kinase" },
+      { word: "NIRAPARIB", hint: "Inhibiteur de PARP" },
+      { word: "NITROFURANTOINE", hint: "Antibiotique urinaire" },
+      { word: "NIVOLUMAB", hint: "Immunothérapie anti-PD-1" },
+      { word: "NORADRENALINE", hint: "Vasopresseur" },
+
+      { word: "OLANZAPINE", hint: "Antipsychotique" },
+      { word: "OLAPARIB", hint: "Inhibiteur de PARP" },
+      { word: "OMEPRAZOLE", hint: "IPP" },
+      { word: "ONDANSETRON", hint: "Antiémétique" },
+      { word: "OXALIPLATINE", hint: "Chimiothérapie à base de platine" },
+      { word: "OXCARBAZEPINE", hint: "Antiépileptique" },
+      { word: "OXACILLINE", hint: "Pénicilline M" },
+      { word: "OXYCODONE", hint: "Antalgique opioïde" },
+
+      { word: "PACLITAXEL", hint: "Taxane" },
+      { word: "PALBOCICLIB", hint: "Inhibiteur CDK4/6" },
+      { word: "PANTOPRAZOLE", hint: "IPP" },
+      { word: "PARACETAMOL", hint: "Antalgique antipyrétique" },
+      { word: "PAROXETINE", hint: "ISRS" },
+      { word: "PAZOPANIB", hint: "Inhibiteur de tyrosine kinase" },
+      { word: "PEGFILGRASTIM", hint: "Facteur de croissance" },
+      { word: "PEMBROLIZUMAB", hint: "Immunothérapie anti-PD-1" },
+      { word: "PEMETREXED", hint: "Antifolate" },
+      { word: "PERINDOPRIL", hint: "IEC" },
+      { word: "PHENOBARBITAL", hint: "Antiépileptique" },
+      { word: "PHENYTOINE", hint: "Antiépileptique" },
+      { word: "PIPERACILLINE", hint: "Antibiotique bêta-lactamine" },
+      { word: "POMALIDOMIDE", hint: "Immunomodulateur" },
+      { word: "POSACONAZOLE", hint: "Antifongique azolé" },
+      { word: "PREDNISOLONE", hint: "Corticoïde" },
+      { word: "PREDNISONE", hint: "Corticoïde" },
+      { word: "PREGABALINE", hint: "Antiépileptique / antalgique" },
+      { word: "PROPOFOL", hint: "Anesthésique injectable" },
+
+      { word: "QUETIAPINE", hint: "Antipsychotique" },
+
+      { word: "RAMIPRIL", hint: "IEC" },
+      { word: "REGORAFENIB", hint: "Inhibiteur de tyrosine kinase" },
+      { word: "REMIFENTANIL", hint: "Opioïde anesthésique" },
+      { word: "REMDESIVIR", hint: "Antiviral injectable" },
+      { word: "RIBOCICLIB", hint: "Inhibiteur CDK4/6" },
+      { word: "RIFAMPICINE", hint: "Antibiotique antituberculeux" },
+      { word: "RISPERIDONE", hint: "Antipsychotique" },
+      { word: "RITUXIMAB", hint: "Anticorps monoclonal" },
+      { word: "RIVAROXABAN", hint: "Anticoagulant oral direct" },
+      { word: "ROCURONIUM", hint: "Curare" },
+      { word: "ROMIPLOSTIM", hint: "Agoniste TPO" },
+      { word: "ROPIVACAINE", hint: "Anesthésique local" },
+      { word: "ROSUVASTATINE", hint: "Statine" },
+      { word: "RUCAPARIB", hint: "Inhibiteur de PARP" },
+
+      { word: "SALBUTAMOL", hint: "Bronchodilatateur" },
+      { word: "SALMETEROL", hint: "Bronchodilatateur" },
+      { word: "SERTRALINE", hint: "ISRS" },
+      { word: "SIROLIMUS", hint: "Inhibiteur mTOR" },
+      { word: "SOMATOSTATINE", hint: "Hormone peptidique" },
+      { word: "SORAFENIB", hint: "Inhibiteur de tyrosine kinase" },
+      { word: "SOTALOL", hint: "Antiarythmique" },
+      { word: "SPIRONOLACTONE", hint: "Diurétique épargneur de potassium" },
+      { word: "SUFENTANIL", hint: "Opioïde anesthésique" },
+      { word: "SUGAMMADEX", hint: "Antagoniste du rocuronium" },
+      { word: "SULBACTAM", hint: "Inhibiteur de bêta-lactamase" },
+      { word: "SUNITINIB", hint: "Inhibiteur de tyrosine kinase" },
+
+      { word: "TACROLIMUS", hint: "Immunosuppresseur" },
+      { word: "TAMOXIFENE", hint: "Hormonothérapie" },
+      { word: "TAZOBACTAM", hint: "Inhibiteur de bêta-lactamase" },
+      { word: "TEICOPLANINE", hint: "Glycopeptide" },
+      { word: "TEMOZOLOMIDE", hint: "Agent alkylant oral" },
+      { word: "TEDIZOLIDE", hint: "Oxazolidinone" },
+      { word: "TIGECYCLINE", hint: "Glycylcycline" },
+      { word: "TINZAPARINE", hint: "HBPM" },
+      { word: "TIOTROPIUM", hint: "Bronchodilatateur" },
+      { word: "TOBRAMYCINE", hint: "Aminoside" },
+      { word: "TOCILIZUMAB", hint: "Anti-IL6" },
+      { word: "TOPIRAMATE", hint: "Antiépileptique" },
+      { word: "TOPOTECAN", hint: "Inhibiteur de topoisomérase" },
+      { word: "TRASTUZUMAB", hint: "Anti-HER2" },
+      { word: "TRIMETHOPRIME", hint: "Antibiotique" },
+
+      { word: "URAPIDIL", hint: "Antihypertenseur injectable" },
+      { word: "USTEKINUMAB", hint: "Biothérapie" },
+
+      { word: "VALACICLOVIR", hint: "Antiviral" },
+      { word: "VALGANCICLOVIR", hint: "Antiviral anti-CMV" },
+      { word: "VALPROATE", hint: "Antiépileptique" },
+      { word: "VALSARTAN", hint: "ARA2" },
+      { word: "VANCOMYCINE", hint: "Glycopeptide" },
+      { word: "VASOPRESSINE", hint: "Vasopresseur" },
+      { word: "VEDOLIZUMAB", hint: "Biothérapie digestive" },
+      { word: "VENETOCLAX", hint: "Inhibiteur de BCL-2" },
+      { word: "VENLAFAXINE", hint: "Antidépresseur" },
+      { word: "VERAPAMIL", hint: "Inhibiteur calcique" },
+      { word: "VINBLASTINE", hint: "Alcaloïde de la pervenche" },
+      { word: "VINCRISTINE", hint: "Alcaloïde de la pervenche" },
+      { word: "VINORELBINE", hint: "Alcaloïde de la pervenche" },
+      { word: "VORICONAZOLE", hint: "Antifongique azolé" },
+
+      { word: "WARFARINE", hint: "AVK" },
+
+      { word: "ZOLPIDEM", hint: "Hypnotique" },
+      { word: "ZOPICLONE", hint: "Hypnotique" }
+    ];
+
+    const MAX_TRIES = 6;
+
+    const board = document.getElementById("board");
+    const keyboard = document.getElementById("keyboard");
+    const message = document.getElementById("message");
+    const hint = document.getElementById("hint");
+
+    let target = "";
+    let targetHint = "";
+    let currentTry = 0;
+    let currentGuess = "";
+    let gameOver = false;
+    let attemptsSummary = [];
+
+    const VALID_WORDS = WORDS.map(item => normalizeWord(item.word));
+
+    function normalizeWord(str) {
+      return str
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^A-Z]/g, "");
+    }
+
+    function todayKey() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function hashString(str) {
+      let hash = 0;
+
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0;
+      }
+
+      return Math.abs(hash);
+    }
+
+    function pickDailyWord() {
+      const day = todayKey();
+      const index = hashString(day) % WORDS.length;
+      const item = WORDS[index];
+
+      target = normalizeWord(item.word);
+      targetHint = item.hint;
+    }
+
+    function createBoard() {
+      board.innerHTML = "";
+      board.style.gridTemplateRows = `repeat(${MAX_TRIES}, auto)`;
+
+      for (let r = 0; r < MAX_TRIES; r++) {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.style.gridTemplateColumns = `repeat(${target.length}, auto)`;
+
+        for (let c = 0; c < target.length; c++) {
+          const tile = document.createElement("div");
+          tile.className = "tile";
+          tile.id = `tile-${r}-${c}`;
+          row.appendChild(tile);
+        }
+
+        board.appendChild(row);
+      }
+    }
+
+    function createKeyboard() {
+      keyboard.innerHTML = "";
+
+      const rows = [
+        "AZERTYUIOP",
+        "QSDFGHJKLM",
+        "WXCVBN"
+      ];
+
+      rows.forEach((letters, index) => {
+        const keyrow = document.createElement("div");
+        keyrow.className = "keyrow";
+
+        if (index === 2) {
+          const enter = createKey("Entrer", "wide");
+          enter.onclick = submitGuess;
+          keyrow.appendChild(enter);
+        }
+
+        letters.split("").forEach(letter => {
+          const key = createKey(letter);
+          key.onclick = () => pressLetter(letter);
+          keyrow.appendChild(key);
+        });
+
+        if (index === 2) {
+          const back = createKey("⌫", "wide");
+          back.onclick = deleteLetter;
+          keyrow.appendChild(back);
+        }
+
+        keyboard.appendChild(keyrow);
+      });
+    }
+
+    function createKey(label, extraClass = "") {
+      const key = document.createElement("div");
+      key.className = `key ${extraClass}`;
+      key.textContent = label;
+      key.dataset.key = label.length === 1 ? label : "";
+      return key;
+    }
+
+    function pressLetter(letter) {
+      if (gameOver) return;
+      if (currentGuess.length >= target.length) return;
+
+      currentGuess += letter;
+      updateCurrentRow();
+    }
+
+    function deleteLetter() {
+      if (gameOver) return;
+      if (currentGuess.length <= 1) return;
+
+      currentGuess = currentGuess.slice(0, -1);
+      updateCurrentRow();
+    }
+
+    function updateCurrentRow() {
+      for (let c = 0; c < target.length; c++) {
+        const tile = document.getElementById(`tile-${currentTry}-${c}`);
+        tile.textContent = currentGuess[c] || "";
+        tile.classList.toggle("current", c === currentGuess.length);
+      }
+    }
+
+    function submitGuess() {
+      if (gameOver) return;
+
+      if (currentGuess.length !== target.length) {
+        showMessage(`Il faut ${target.length} lettres.`, "bad");
+        return;
+      }
+
+      const guess = normalizeWord(currentGuess);
+
+      if (!VALID_WORDS.includes(guess)) {
+        showMessage("Mot non reconnu dans la liste.", "bad");
+        return;
+      }
+
+      revealGuess(guess);
+
+      if (guess === target) {
+        gameOver = true;
+        showEndMessage(true, currentTry + 1);
+        return;
+      }
+
+      currentTry++;
+      currentGuess = target[0];
+
+      if (currentTry >= MAX_TRIES) {
+        gameOver = true;
+        showEndMessage(false, MAX_TRIES);
+      } else {
+        showMessage("");
+        updateCurrentRow();
+      }
+    }
+
+    function revealGuess(guess) {
+      const targetLetters = target.split("");
+      const guessLetters = guess.split("");
+      const statuses = Array(target.length).fill("absent");
+
+      for (let i = 0; i < target.length; i++) {
+        if (guessLetters[i] === targetLetters[i]) {
+          statuses[i] = "correct";
+          targetLetters[i] = null;
+          guessLetters[i] = null;
+        }
+      }
+
+      for (let i = 0; i < target.length; i++) {
+        if (guessLetters[i] === null) continue;
+
+        const index = targetLetters.indexOf(guessLetters[i]);
+
+        if (index !== -1) {
+          statuses[i] = "present";
+          targetLetters[index] = null;
+        }
+      }
+
+      for (let i = 0; i < target.length; i++) {
+        const tile = document.getElementById(`tile-${currentTry}-${i}`);
+        tile.textContent = guess[i];
+        tile.classList.remove("current");
+        tile.classList.add(statuses[i]);
+        updateKeyStatus(guess[i], statuses[i]);
+      }
+
+      attemptsSummary.push({
+        guess,
+        statuses
+      });
+    }
+
+    function updateKeyStatus(letter, status) {
+      const key = document.querySelector(`.key[data-key="${letter}"]`);
+      if (!key) return;
+
+      const priority = {
+        absent: 1,
+        present: 2,
+        correct: 3
+      };
+
+      const existing = ["correct", "present", "absent"].find(s => key.classList.contains(s));
+
+      if (!existing || priority[status] > priority[existing]) {
+        key.classList.remove("correct", "present", "absent");
+        key.classList.add(status);
+      }
+    }
+
+    function statusToEmoji(status) {
+      if (status === "correct") return "🟥";
+      if (status === "present") return "🟡";
+      return "⬛";
+    }
+
+    function showEndMessage(win, tries) {
+      const result = win ? `${tries}/${MAX_TRIES}` : `X/${MAX_TRIES}`;
+
+      const title = win
+        ? `Bravo ! ${target} trouvé en ${tries}/${MAX_TRIES}.`
+        : `Perdu. Le mot était ${target}.`;
+
+      const graphHtml = attemptsSummary.map((attempt, index) => {
+        const squares = attempt.statuses.map(statusToEmoji).join("");
+
+        return `
+          <div class="share-row">
+            <span class="share-try">${index + 1}</span>
+            <span class="share-squares">${squares}</span>
+          </div>
+        `;
+      }).join("");
+
+      message.innerHTML = `
+        <div class="end-summary">
+          <div class="end-title">${title}</div>
+
+          <div class="share-card">
+            <div class="share-header">PharmaSutom ${todayKey()}</div>
+            <div class="share-result">Résultat : ${result}</div>
+            <div class="share-hint">${target.length} lettres · ${targetHint}</div>
+            <div class="share-graph">${graphHtml}</div>
+          </div>
+
+          <button onclick="copyResult()" style="margin-top:12px">
+            Copier le résultat
+          </button>
+        </div>
+      `;
+
+      message.className = win ? "message good" : "message bad";
+    }
+
+    function copyResult() {
+      const win = attemptsSummary.some(a => a.guess === target);
+      const tries = win ? attemptsSummary.length : "X";
+      const result = `${tries}/${MAX_TRIES}`;
+
+      const graphText = attemptsSummary.map(attempt => {
+        return attempt.statuses.map(statusToEmoji).join("");
+      }).join("\n");
+
+      const text = `PharmaSutom ${todayKey()}
+Résultat : ${result}
+${target.length} lettres · ${targetHint}
+
+${graphText}`;
+
+      navigator.clipboard.writeText(text)
+        .then(() => {
+          showMessage("Résultat copié, prêt à envoyer aux copains.", "good");
+        })
+        .catch(() => {
+          alert(text);
+        });
+    }
+
+    function showMessage(text, type = "") {
+      message.textContent = text;
+      message.className = `message ${type}`;
+    }
+
+    function startGame() {
+      pickDailyWord();
+
+      currentTry = 0;
+      currentGuess = target[0];
+      gameOver = false;
+      attemptsSummary = [];
+
+      hint.textContent = `${target.length} lettres · ${targetHint}`;
+      showMessage("");
+
+      createBoard();
+      createKeyboard();
+
+      const firstTile = document.getElementById("tile-0-0");
+      firstTile.textContent = target[0];
+      firstTile.classList.add("correct");
+
+      updateCurrentRow();
+    }
+
+    document.addEventListener("keydown", (e) => {
+      const key = e.key.toUpperCase();
+
+      if (/^[A-Z]$/.test(key)) {
+        pressLetter(key);
+      } else if (e.key === "Backspace") {
+        deleteLetter();
+      } else if (e.key === "Enter") {
+        submitGuess();
+      }
+    });
+
+    startGame();
+  </script>
+</body>
+</html>
