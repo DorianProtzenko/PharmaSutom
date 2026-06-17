@@ -829,27 +829,28 @@ footer.app-footer{
   const btnRevealHint = document.getElementById("btnRevealHint");
   const btnHint = document.getElementById("btnHint");
 
-  function refreshHintsUI(){
+  function refreshHintsUI(forceDisplayAll){
     const meta = DCI_META[state.target] || {};
     const groupeEl = document.getElementById("hintGroupe");
     const codeEl = document.getElementById("hintCode");
     const familleEl = document.getElementById("hintFamille");
+    const displayLevel = forceDisplayAll ? 3 : state.hintsRevealed;
 
-    if(state.hintsRevealed >= 1){
+    if(displayLevel >= 1){
       groupeEl.textContent = meta.groupe || "—";
       groupeEl.classList.remove("hint-locked");
     }else{
       groupeEl.textContent = "Cliquez sur « Indice ATC » pour révéler le groupe anatomique principal.";
       groupeEl.classList.add("hint-locked");
     }
-    if(state.hintsRevealed >= 2){
+    if(displayLevel >= 2){
       codeEl.textContent = meta.atc || "—";
       codeEl.classList.remove("hint-locked");
     }else{
       codeEl.textContent = "Un 2ᵉ indice révèle le code à 3 caractères (ex. C09, J01…).";
       codeEl.classList.add("hint-locked");
     }
-    if(state.hintsRevealed >= 3){
+    if(displayLevel >= 3){
       familleEl.textContent = meta.famille || "—";
       familleEl.classList.remove("hint-locked");
     }else{
@@ -857,9 +858,11 @@ footer.app-footer{
       familleEl.classList.add("hint-locked");
     }
     btnRevealHint.disabled = state.hintsRevealed >= 3 || state.finished;
-    btnRevealHint.textContent = state.hintsRevealed >= 3
-      ? "Tous les indices sont révélés"
-      : `Révéler l'indice suivant (${state.hintsRevealed}/3 utilisés)`;
+    btnRevealHint.textContent = state.finished
+      ? `Partie terminée — ${state.hintsRevealed}/3 indice(s) utilisé(s)`
+      : (state.hintsRevealed >= 3
+        ? "Tous les indices sont révélés"
+        : `Révéler l'indice suivant (${state.hintsRevealed}/3 utilisés)`);
   }
 
   function revealNextHint(){
@@ -984,9 +987,8 @@ footer.app-footer{
       endSlot.appendChild(card);
     }
 
-    state.hintsRevealed = 3;
     noticeBox.classList.add("open");
-    refreshHintsUI();
+    refreshHintsUI(true); // true = afficher tous les indices à l'écran sans modifier le compteur réel
     inputEl.disabled = true;
 
     if(!isRestoring){
@@ -1300,7 +1302,6 @@ svg{ width:100%; height:160px; display:block; }
 
     noticeBox.classList.remove("open");
     if(state.finished){
-      state.hintsRevealed = 3;
       finishGame(true);
     }else{
       showMessage("DCI du jour — première lettre déjà révélée sur le plateau.");
