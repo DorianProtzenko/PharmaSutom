@@ -109,12 +109,12 @@ html,body{
 }
 
 .toolbar{
-  display:grid;
-  grid-template-columns: 1fr 1fr;
+  display:flex;
   gap:8px;
   margin: 12px 0 14px;
+  flex-wrap: wrap;
 }
-.toolbar .btn{ width:100%; }
+.toolbar .btn{ flex: 1 1 auto; }
 .btn{
   font-family: var(--sans);
   font-size: 13px;
@@ -414,11 +414,10 @@ footer.app-footer{
       <h1 class="brand"><span class="rx">℞</span>PharmaSutom</h1>
       <span class="dosage-tag" id="lengthTag">9 lettres</span>
     </div>
-    <p class="subtitle">Devinez la DCI du jour · toute tentative reconnue par le dictionnaire est acceptée</p>
+    <p class="subtitle">La DCI du jour — la même pour tout le monde · <span id="dateTag"></span></p>
   </div>
 
   <div class="toolbar">
-    <button class="btn primary" id="btnNew">Nouvelle DCI</button>
     <button class="btn" id="btnHint">Indice ATC</button>
     <button class="btn ghost" id="btnHistory">Historique</button>
     <button class="btn ghost" id="btnExport">Exporter le graphe (HTML)</button>
@@ -477,6 +476,7 @@ footer.app-footer{
 
   const MAX_ATTEMPTS = 6;
   const STORAGE_KEY = "pharmasutom_history_v1";
+  const PROGRESS_KEY = "pharmasutom_progress_v1";
 
   // ---------- Chargement des données embarquées ----------
   let DCI_META = {};
@@ -534,9 +534,31 @@ footer.app-footer{
     startedAt: null,
   };
 
+  function todayDateString(){
+    // Date locale au format AAAA-MM-JJ, stable pour tous les joueurs partageant le même jour calendaire
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function hashString(str){
+    // Hash déterministe simple (FNV-1a 32 bits) — même résultat partout, pour tous les joueurs
+    let hash = 0x811c9dc5;
+    for(let i = 0; i < str.length; i++){
+      hash ^= str.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return hash >>> 0;
+  }
+
   function pickTarget(){
-    const idx = Math.floor(Math.random() * DCI_WORDS.length);
-    return DCI_WORDS[idx];
+    // Mot du jour : identique pour tout le monde, change chaque jour calendaire.
+    const sortedWords = DCI_WORDS.slice().sort(); // ordre stable indépendant du chargement JSON
+    const dateKey = todayDateString();
+    const idx = hashString(dateKey) % sortedWords.length;
+    return sortedWords[idx];
   }
 
   function normalize(str){
@@ -773,6 +795,7 @@ footer.app-footer{
     refreshHintsUI();
     noticeBox.classList.add("open");
     showMessage("Indice révélé.");
+    saveProgress();
   }
 
   noticeHead.addEventListener("click", () => noticeBox.classList.toggle("open"));
@@ -823,14 +846,15 @@ footer.app-footer{
     if(won){
       state.finished = true;
       state.won = true;
-      setTimeout(() => finishGame(), 500);
+      setTimeout(() => finishGame(false), 500);
     }else if(state.currentRow >= MAX_ATTEMPTS){
       state.finished = true;
       state.won = false;
-      setTimeout(() => finishGame(), 500);
+      setTimeout(() => finishGame(false), 500);
     }else{
       paintFirstLetterHint();
     }
+    saveProgress();
     refreshHintsUI();
   }
 
@@ -844,7 +868,7 @@ footer.app-footer{
   });
 
   // ---------- Fin de partie ----------
-  function finishGame(){
+  function finishGame(isRestoring){
     const meta = DCI_META[state.target] || {};
     endSlot.innerHTML = "";
     const panel = document.createElement("div");
@@ -854,18 +878,19 @@ footer.app-footer{
       <div class="molecule">${state.target}</div>
       <div class="meta">${meta.famille ? meta.famille + " · ATC " + meta.atc : ""}</div>
       <div class="meta">${state.won ? "En " + state.attempts.length + " essai(s) sur " + MAX_ATTEMPTS : "Le mot n'a pas été trouvé en " + MAX_ATTEMPTS + " essais"}</div>
-      <div class="end-actions">
-        <button class="btn primary" id="btnPlayAgain">Nouvelle DCI</button>
-      </div>
+      <div class="meta">Revenez demain pour une nouvelle DCI du jour !</div>
     `;
     endSlot.appendChild(panel);
-    document.getElementById("btnPlayAgain").addEventListener("click", startNewGame);
 
     state.hintsRevealed = 3;
     noticeBox.classList.add("open");
     refreshHintsUI();
+    inputEl.disabled = true;
 
-    saveResultToHistory();
+    if(!isRestoring){
+      saveResultToHistory();
+    }
+    saveProgress();
     renderStatsStrip();
   }
 
@@ -1071,43 +1096,107 @@ svg{ width:100%; height:160px; display:block; }
     showMessage("Graphe exporté : pharmasutom-resultats.html");
   }
 
-  // ---------- Nouvelle partie ----------
-  function startNewGame(){
-    state = {
-      target: pickTarget(),
-      length: 0,
-      attempts: [],
-      currentRow: 0,
-      finished: false,
-      won: false,
-      hintsRevealed: 0,
-      startedAt: Date.now(),
-    };
-    state.length = state.target.length;
-    Object.keys(keyStatus).forEach(k => delete keyStatus[k]);
-    buildBoard();
-    paintFirstLetterHint();
-    buildKeyboard();
-    endSlot.innerHTML = "";
-    inputEl.value = "";
-    inputEl.disabled = false;
-    showMessage("Nouvelle DCI ! Première lettre déjà révélée sur le plateau.");
-    noticeBox.classList.remove("open");
-    refreshHintsUI();
-    renderStatsStrip();
-    inputEl.focus();
+  // ---------- Progression du jour (persistance) ----------
+  function loadProgress(){
+    try{
+      const raw = localStorage.getItem(PROGRESS_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+  function saveProgress(){
+    try{
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify({
+        date: todayDateString(),
+        target: state.target,
+        attempts: state.attempts,
+        currentRow: state.currentRow,
+        finished: state.finished,
+        won: state.won,
+        hintsRevealed: state.hintsRevealed,
+      }));
+    }catch(e){ console.warn("Impossible d'enregistrer la progression", e); }
   }
 
-  document.getElementById("btnNew").addEventListener("click", () => {
-    if(state.finished || confirm("Abandonner la partie en cours et tirer une nouvelle DCI ?")){
-      startNewGame();
+  // ---------- Partie du jour ----------
+  function startTodayGame(){
+    const today = todayDateString();
+    const target = pickTarget();
+    const saved = loadProgress();
+
+    if(saved && saved.date === today && saved.target === target){
+      // Reprendre la partie du jour déjà commencée sur ce navigateur
+      state = {
+        target: target,
+        length: target.length,
+        attempts: saved.attempts || [],
+        currentRow: saved.currentRow || 0,
+        finished: !!saved.finished,
+        won: !!saved.won,
+        hintsRevealed: saved.hintsRevealed || 0,
+        startedAt: Date.now(),
+      };
+    }else{
+      // Nouveau jour : grille vierge sur la DCI du jour
+      state = {
+        target: target,
+        length: target.length,
+        attempts: [],
+        currentRow: 0,
+        finished: false,
+        won: false,
+        hintsRevealed: 0,
+        startedAt: Date.now(),
+      };
     }
-  });
+
+    Object.keys(keyStatus).forEach(k => delete keyStatus[k]);
+    buildBoard();
+
+    // Rejouer les tentatives déjà enregistrées aujourd'hui (sans animation de flip)
+    state.attempts.forEach((att, r) => {
+      const row = boardEl.querySelector(`.row[data-row="${r}"]`);
+      const cells = row.querySelectorAll(".cell");
+      cells.forEach((cell, i) => {
+        cell.textContent = att.word[i];
+        cell.classList.add(att.marks[i]);
+      });
+      updateKeyboard(att.word, att.marks);
+    });
+
+    paintFirstLetterHint();
+    buildKeyboard();
+    // buildKeyboard() vide le clavier — on doit réappliquer les couleurs après reconstruction
+    state.attempts.forEach(att => updateKeyboard(att.word, att.marks));
+
+    endSlot.innerHTML = "";
+    inputEl.value = "";
+    inputEl.disabled = state.finished;
+
+    noticeBox.classList.remove("open");
+    if(state.finished){
+      state.hintsRevealed = 3;
+      finishGame(true);
+    }else{
+      showMessage("DCI du jour — première lettre déjà révélée sur le plateau.");
+    }
+    refreshHintsUI();
+    renderStatsStrip();
+    if(!state.finished) inputEl.focus();
+  }
+
+  function renderDateTag(){
+    const el = document.getElementById("dateTag");
+    if(!el) return;
+    const now = new Date();
+    const formatted = now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    el.textContent = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+  }
 
   // ---------- Initialisation ----------
   async function init(){
+    renderDateTag();
     await loadDictionary();
-    startNewGame();
+    startTodayGame();
   }
   init();
 
