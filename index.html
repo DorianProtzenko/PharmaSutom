@@ -477,6 +477,45 @@ footer.app-footer{
   .cell{ width:34px; height:40px; font-size:16px; }
   .key{ height:38px; font-size:12px; }
 }
+
+/* ---------- TUTORIEL / POPUP ---------- */
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(30,42,56,0.55); z-index:1000;
+  display:flex; align-items:center; justify-content:center;
+  padding:16px;
+}
+.modal-overlay.hidden{ display:none; }
+.modal-box{
+  background:var(--paper); border:2px solid var(--ink); border-radius:8px;
+  max-width:480px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.25);
+  padding:24px 22px 18px; position:relative;
+  font-family: var(--sans);
+}
+.modal-box h2{
+  font-family:var(--serif); font-size:20px; margin:0 0 14px;
+  color:var(--ink);
+}
+.modal-legend{
+  display:flex; flex-direction:column; gap:10px; margin-bottom:16px;
+}
+.modal-row{
+  display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--ink-soft);
+}
+.modal-tiles{
+  display:flex; gap:4px; flex-shrink:0;
+}
+.tuto-cell{
+  width:30px; height:34px; border-radius:5px; display:flex; align-items:center;
+  justify-content:center; font-family:var(--mono); font-weight:700; font-size:15px;
+  color:#fff; border:1px solid rgba(30,42,56,0.2);
+}
+.tuto-cell.good{ background:var(--good); }
+.tuto-cell.mid{ background:var(--mid); }
+.tuto-cell.bad{ background:var(--bad-deep); }
+.tuto-cell.locked{ background:var(--foil); color:var(--ink-soft); border-color:rgba(30,42,56,0.25); }
+.modal-close-btn{
+  margin-top:12px; width:100%;
+}
 </style>
 </head>
 <body>
@@ -679,20 +718,49 @@ footer.app-footer{
     });
   }
 
+  // Calcule les lettres déjà confirmées "good" aux positions précises
+  function getGoodPositions(){
+    const goodMap = {};
+    state.attempts.forEach(att => {
+      att.marks.forEach((m, i) => {
+        if(m === "good") goodMap[i] = att.word[i];
+      });
+    });
+    return goodMap;
+  }
+
   function renderRowGuessInProgress(text){
     const row = boardEl.querySelector(`.row[data-row="${state.currentRow}"]`);
     if(!row) return;
     row.classList.add("current");
     const cells = row.querySelectorAll(".cell");
+    const goodMap = getGoodPositions();
+
     cells.forEach((cell, i) => {
+      // Lettre confirmée à cette position (good dans un essai précédent)
+      if(goodMap[i] !== undefined){
+        cell.textContent = goodMap[i];
+        cell.classList.remove("filled");
+        cell.classList.add("locked");
+        // Mise en valeur visuelle légère pour montrer que c'est confirmé
+        cell.style.backgroundColor = "rgba(58,125,111,0.15)";
+        cell.style.color = "var(--good-deep)";
+        return;
+      }
+      // 1ère lettre toujours révélée
       if(i === 0){
         cell.textContent = state.target[0];
         cell.classList.add("locked");
+        cell.style.backgroundColor = "";
+        cell.style.color = "";
         return;
       }
       const ch = text[i] || "";
       cell.textContent = ch;
       cell.classList.toggle("filled", !!ch);
+      cell.classList.remove("locked");
+      cell.style.backgroundColor = "";
+      cell.style.color = "";
     });
   }
 
@@ -929,6 +997,11 @@ footer.app-footer{
       setTimeout(() => finishGame(false), 500);
     }else{
       paintFirstLetterHint();
+      // Pré-remplir la 1ère lettre dans le champ de saisie pour l'essai suivant
+      inputEl.value = state.target[0] || "";
+      inputEl.focus();
+      const l = inputEl.value.length;
+      inputEl.setSelectionRange(l, l);
     }
     saveProgress();
     refreshHintsUI();
@@ -939,8 +1012,17 @@ footer.app-footer{
     if(e.key === "Enter") submitGuess();
   });
   inputEl.addEventListener("input", () => {
-    inputEl.value = inputEl.value.toUpperCase().replace(/[^A-Za-zÀ-ÿ]/g, "");
-    renderRowGuessInProgress(normalize(inputEl.value));
+    let val = inputEl.value.toUpperCase().replace(/[^A-Za-zA-ZÀ-ÿ]/g, "");
+    // Empêcher la suppression de la 1ère lettre (qui est pré-remplie)
+    const first = state.target ? state.target[0] : "";
+    if(first && !val.startsWith(first)){
+      val = first + val.replace(/^./, "");
+    }
+    if(first && val.length === 0){
+      val = first;
+    }
+    inputEl.value = val;
+    renderRowGuessInProgress(normalize(val));
   });
 
   // ---------- Fin de partie ----------
@@ -1308,7 +1390,13 @@ svg{ width:100%; height:160px; display:block; }
     }
     refreshHintsUI();
     renderStatsStrip();
-    if(!state.finished) inputEl.focus();
+    if(!state.finished){
+      inputEl.value = state.target[0] || "";
+      inputEl.focus();
+      // Placer le curseur à la fin
+      const len = inputEl.value.length;
+      inputEl.setSelectionRange(len, len);
+    }
   }
 
   function renderDateTag(){
@@ -1319,11 +1407,42 @@ svg{ width:100%; height:160px; display:block; }
     el.textContent = formatted.charAt(0).toUpperCase() + formatted.slice(1);
   }
 
+  // ---------- Tutoriel ----------
+  const TUTORIAL_KEY = "pharmasutom_tutorial_seen_v1";
+  const tutorialModal = document.getElementById("tutorialModal");
+  const tutorialClose = document.getElementById("tutorialClose");
+
+  function showTutorialIfNeeded(){
+    try{
+      const seen = localStorage.getItem(TUTORIAL_KEY);
+      if(!seen){
+        tutorialModal.classList.remove("hidden");
+      }
+    }catch(e){ /* si localStorage inaccessible, on ignore */ }
+  }
+
+  if(tutorialClose){
+    tutorialClose.addEventListener("click", () => {
+      tutorialModal.classList.add("hidden");
+      try{ localStorage.setItem(TUTORIAL_KEY, "1"); }catch(e){}
+      if(!state.finished) inputEl.focus();
+    });
+  }
+
+  // Bouton "?" dans la toolbar pour revoir le tutoriel
+  const btnHelp = document.getElementById("btnHelp");
+  if(btnHelp){
+    btnHelp.addEventListener("click", () => {
+      tutorialModal.classList.remove("hidden");
+    });
+  }
+
   // ---------- Initialisation ----------
   async function init(){
     renderDateTag();
     await loadDictionary();
     startTodayGame();
+    showTutorialIfNeeded();
   }
   init();
 
