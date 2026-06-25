@@ -858,9 +858,12 @@ footer.app-footer{
     const cells = row.querySelectorAll(".cell");
     cells.forEach((cell, i) => {
       cell.textContent = guess[i];
+      // Retirer immédiatement toutes les classes d'état (avant le flip)
+      cell.classList.remove("filled","locked","suggested","good","mid","bad");
+      cell.style.backgroundColor = "";
+      cell.style.color = "";
       cell.classList.add("flip");
       setTimeout(() => {
-        cell.classList.remove("filled","locked");
         cell.classList.add(marks[i]);
       }, 180);
     });
