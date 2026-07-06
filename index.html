@@ -469,6 +469,47 @@ footer.app-footer{
   font-family: var(--mono);
 }
 
+/* ---------- SÉLECTEUR DE NIVEAU ---------- */
+.level-selector{
+  display:flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.lvl-btn{
+  flex: 1;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 2px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: all 0.1s ease;
+  letter-spacing: 0.01em;
+}
+.lvl-btn:hover{ border-color: var(--ink); color: var(--ink); transform: translateY(-1px); }
+.lvl-btn:active{ transform: translateY(1px); }
+.lvl-btn.active{ border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.lvl-btn[data-level="facile"].active{ background: var(--good); border-color: var(--good-deep); }
+.lvl-btn[data-level="moyen"].active{ background: var(--mid); border-color: var(--mid-deep); }
+.lvl-btn[data-level="difficile"].active{ background: var(--accent); border-color: var(--accent); }
+.level-badge{
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-left: 6px;
+  vertical-align: middle;
+  color: #fff;
+  background: var(--good);
+  letter-spacing: 0.04em;
+}
+.level-badge.moyen{ background: var(--mid); }
+.level-badge.difficile{ background: var(--accent); }
+
 .visually-hidden{
   position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0);
 }
@@ -571,7 +612,13 @@ footer.app-footer{
       <h1 class="brand"><span class="rx">℞</span>PharmaSutom</h1>
       <span class="dosage-tag" id="lengthTag">9 lettres</span>
     </div>
-    <p class="subtitle">La DCI du jour : · <span id="dateTag"></span></p>
+    <p class="subtitle">La DCI du jour · <span id="dateTag"></span> <span id="levelBadge" class="level-badge">Facile</span></p>
+  </div>
+
+  <div class="level-selector" id="levelSelector">
+    <button class="lvl-btn active" id="lvlFacile" data-level="facile">🟢 Facile</button>
+    <button class="lvl-btn" id="lvlMoyen" data-level="moyen">🟡 Moyen</button>
+    <button class="lvl-btn" id="lvlDifficile" data-level="difficile">🔴 Difficile</button>
   </div>
 
   <div class="toolbar">
@@ -634,7 +681,10 @@ footer.app-footer{
 
   const MAX_ATTEMPTS = 6;
   const STORAGE_KEY = "pharmasutom_history_v1";
-  const PROGRESS_KEY = "pharmasutom_progress_v1";
+  const PROGRESS_KEY_BASE = "pharmasutom_progress_v1";
+  function getProgressKey(level){ return PROGRESS_KEY_BASE + "_" + (level || "facile"); }
+  // Alias pour compatibilité avec le reste du code (sera surchargé dynamiquement)
+  let PROGRESS_KEY = getProgressKey("facile");
 
   // ---------- Chargement des données embarquées ----------
   let DCI_META = {};
@@ -711,12 +761,189 @@ footer.app-footer{
     return hash >>> 0;
   }
 
-  function pickTarget(){
-    // Mot du jour : identique pour tout le monde, change chaque jour calendaire.
-    const sortedWords = DCI_WORDS.slice().sort(); // ordre stable indépendant du chargement JSON
+  // ---------- Système de niveaux de difficulté ----------
+
+  const ALWAYS_EASY = new Set([
+    "METHYLPREDNISOLONE","HYDROCHLOROTHIAZIDE","HYDROXYCHLOROQUINE","ACETYLCYSTEINE",
+    "SULFAMETHOXAZOLE","TRIMETHOPRIME","CARBAMAZEPINE","OXCARBAZEPINE","LEVETIRACETAM",
+    "ATORVASTATINE","ROSUVASTATINE","PRAVASTATINE","SIMVASTATINE","FLUVASTATINE","PITAVASTATINE",
+    "CEFTRIAXONE","AMOXICILLINE","AZITHROMYCINE","CLARITHROMYCINE","CIPROFLOXACINE",
+    "LEVOFLOXACINE","METRONIDAZOLE","DOXYCYCLINE","TETRACYCLINE","MINOCYCLINE",
+    "ENOXAPARINE","RIVAROXABAN","DABIGATRAN","APIXABAN","EDOXABAN",
+    "PANTOPRAZOLE","LANSOPRAZOLE","ESOMEPRAZOLE","RABEPRAZOLE","OMEPRAZOLE",
+    "CANDESARTAN","IRBESARTAN","TELMISARTAN","VALSARTAN","LOSARTAN",
+    "ESCITALOPRAM","VENLAFAXINE","MIRTAZAPINE","SERTRALINE","PAROXETINE","FLUOXETINE","CITALOPRAM",
+    "ARIPIPRAZOLE","RISPERIDONE","OLANZAPINE","QUETIAPINE","HALOPERIDOL","CLOZAPINE",
+    "GABAPENTINE","PREGABALINE","LAMOTRIGINE","TOPIRAMATE","VALPROATE",
+    "FUROSEMIDE","SPIRONOLACTONE","INDAPAMIDE","TORASEMIDE","HYDROCHLOROTHIAZIDE",
+    "METOCLOPRAMIDE","DOMPERIDONE","ONDANSETRON","GRANISETRON",
+    "PARACETAMOL","IBUPROFENE","DICLOFENAC","NAPROXENE","KETOPROFENE","MELOXICAM","CELECOXIB",
+    "DEXAMETHASONE","PREDNISONE","PREDNISOLONE","BETAMETHASONE","CORTISONE","HYDROCORTISONE",
+    "BISOPROLOL","METOPROLOL","PROPRANOLOL","CARVEDILOL","ATENOLOL","NEBIVOLOL","LABETALOL",
+    "AMLODIPINE","DILTIAZEM","VERAPAMIL","NIFEDIPINE",
+    "RAMIPRIL","LISINOPRIL","ENALAPRIL","PERINDOPRIL","CAPTOPRIL","FOSINOPRIL","QUINAPRIL",
+    "LEVOTHYROXINE","METHIMAZOLE","CARBIMAZOLE","PROPYLTHIOURACILE",
+    "METFORMINE","INSULINE","GLIBENCLAMIDE","GLICLAZIDE","GLIMEPIRIDE","SITAGLIPTINE",
+    "LORATADINE","CETIRIZINE","DESLORATADINE","FEXOFENADINE","BILASTINE","RUPATADINE",
+    "SALBUTAMOL","BUDESONIDE","FLUTICASONE","BECLOMETASONE","TIOTROPIUM","MONTELUKAST","THEOPHYLLINE",
+    "MORPHINE","TRAMADOL","CODEINE","FENTANYL","OXYCODONE","HYDROMORPHONE","BUPRENORPHINE",
+    "AMOXICILLINE","CEFTRIAXONE","PENICILLINE","AMPICILLINE","OXACILLINE","FLUCLOXACILLINE",
+    "FLUCONAZOLE","ITRACONAZOLE","VORICONAZOLE","TERBINAFINE","AMPHOTERICINE",
+    "ACICLOVIR","VALACICLOVIR","OSELTAMIVIR","GANCICLOVIR","VALGANCICLOVIR",
+    "COLCHICINE","ALLOPURINOL","METHOTREXATE",
+    "DIAZEPAM","LORAZEPAM","ALPRAZOLAM","MIDAZOLAM","CLONAZEPAM","OXAZEPAM","BROMAZEPAM",
+    "LITHIUM","CLOMIPRAMINE","AMITRIPTYLINE","IMIPRAMINE","NORTRIPTYLINE",
+    "WARFARINE","ACENOCOUMAROL","HEPARINE","DALTEPARINE","TINZAPARINE","FONDAPARINUX",
+    "VANCOMYCINE","GENTAMICINE","TOBRAMYCINE","AMIKACINE","STREPTOMYCINE","NETILMICINE",
+    "CISPLATINE","CARBOPLATINE","OXALIPLATINE","CYCLOPHOSPHAMIDE","IFOSFAMIDE","FLUOROURACILE",
+    "METHOTREXATE","DOXORUBICINE","EPIRUBICINE","VINCRISTINE","VINBLASTINE","VINORELBINE",
+    "DOCETAXEL","PACLITAXEL","GEMCITABINE","CAPECITABINE","IRINOTECAN","ETOPOSIDE",
+    "TAMOXIFENE","ANASTROZOLE","LETROZOLE","EXEMESTANE",
+    "RITUXIMAB","TRASTUZUMAB","BEVACIZUMAB","CETUXIMAB","ADALIMUMAB","INFLIXIMAB",
+    "ETANERCEPT","GOLIMUMAB","CERTOLIZUMAB","TOCILIZUMAB","ABATACEPT",
+    "IMATINIB","DASATINIB","NILOTINIB","ERLOTINIB","GEFITINIB","SORAFENIB","SUNITINIB",
+    "LEVODOPA","CARBIDOPA","BENSERAZIDE","PRAMIPEXOLE","ROPINIROLE","ENTACAPONE",
+    "AMIODARONE","DIGOXINE","ADENOSINE","ADRENALINE","NORADRENALINE","DOPAMINE","DOBUTAMINE",
+    "FUROSEMIDE","SPIRONOLACTONE","AMILORIDE","EPLERENONE",
+    "ATORVASTATINE","SIMVASTATINE","PRAVASTATINE","ROSUVASTATINE",
+    "METFORMINE","PIOGLITAZONE","LIRAGLUTIDE","SEMAGLUTIDE","DULAGLUTIDE","EXENATIDE",
+    "ASPIRIN","ASPIRINE","CLOPIDOGREL","PRASUGREL","TICAGRELOR",
+    "RANITIDINE","CIMETIDINE","FAMOTIDINE","NIZATIDINE",
+    "RIFAMPICINE","ISONIAZIDE","ETHAMBUTOL","PYRAZINAMIDE",
+    "PHYTOMENADIONE","ACIDEFOLIQUE","CYANOCOBALAMINE","HYDROXOCOBALAMINE","THIAMINE","PYRIDOXINE",
+    "CHOLECALCIFEROL","CALCITRIOL","ERGOCALCIFEROL","CALCIDIOL",
+    "METRONIDAZOLE","TINIDAZOLE","ORNIDAZOLE","SECNIDAZOLE",
+    "CLARITHROMYCINE","AZITHROMYCINE","SPIRAMYCINE","ERYTHROMYCINE",
+    "CEFOTAXIME","CEFTAZIDIME","CEFUROXIME","CEFALEXINE","CEFAZOLINE","CEFEPIME",
+    "IMIPENEM","MEROPENEM","ERTAPENEM","DORIPENEM",
+    "LINEZOLIDE","CLINDAMYCINE","LINCOMYCINE","COLISTINE","FOSFOMYCINE","NITROFURANTOINE",
+    "DAPAGLIFLOZINE","EMPAGLIFLOZINE","CANAGLIFLOZINE","LIRAGLUTIDE",
+    "OMALIZUMAB","MEPOLIZUMAB","BENRALIZUMAB","DUPILUMAB",
+    "ALENDRONATE","RISEDRONATE","ZOLEDRONATE","DENOSUMAB",
+    "TERIPARATIDE","CALCITONINE",
+    "ATROPINE","SCOPOLAMINE","IPRATROPIUM",
+    "KETAMINE","PROPOFOL","ETOMIDATE","THIOPENTAL","MIDAZOLAM","SEVOFLURANE","DESFLURANE","ISOFLURANE",
+    "LIDOCAINE","BUPIVACAINE","ROPIVACAINE","MEPIVACAINE","PRILOCAINE",
+    "NALOXONE","FLUMAZENIL","PROTAMINE","SUGAMMADEX",
+    "COLESTYRAMINE","FENOFIBRATE","GEMFIBROZIL","BEZAFIBRATE","CIPROFIBRATE",
+    "SUCRALFATE","MISOPROSTOL","PHLOROGLUCINOL","PRUCALOPRIDE","LOPERAMIDE","LACTULOSE",
+    "HYDROXYZINE","PROMETHAZINE","DIPHENHYDRAMINE","CHLORPROMAZINE","LEVOMEPROMAZINE",
+    "DONEPEZIL","RIVASTIGMINE","GALANTAMINE","MEMANTINE",
+  ]);
+
+  const ALWAYS_HARD = new Set([
+    "AXICABTAGENE","BREXUCABTAGENE","CILTACABTAGENE","IDECABTAGENE","LISOCABTAGENE","TISAGENLECLEUCEL",
+    "TOFERSEN","NUSINERSEN","RISDIPLAM","ONASEMNOGENE",
+    "IBRITUMOMAB","TOSITUMOMAB",
+    "PHYSOSTIGMINE","PRALIDOXIME","DIMERCAPTOSUCCINATE","DIMERCAPROL","DIMERCAPROL",
+    "TRABECTEDINE","CEDAZURIDINE","PRETOMANID","DELAMANID","BEDAQUILINE",
+    "SPESOLIMAB","IMSIDOLIMAB","ETELCALCETIDE",
+    "ELRANATAMAB","TECLISTAMAB","TALQUETAMAB","GLOFITAMAB","EPCORITAMAB","MOSUNETUZUMAB",
+    "ZANIDATAMAB","LONCASTUXIMAB","MIRVETUXIMAB","SACITUZUMAB","BELANTAMAB","TISOTUMAB",
+    "POLATUZUMAB","TRASTUZUMAB","BRENTUXIMAB","INOTUZUMAB","GEMTUZUMAB","DARATUMUMAB",
+    "ISATUXIMAB","MOGAMULIZUMAB","ELOTUZUMAB","OBINUTUZUMAB","UBLITUXIMAB",
+    "AXICABTAGENE","BREXUCABTAGENE","CILTACABTAGENE","IDECABTAGENE","LISOCABTAGENE",
+    "NAVITOCLAX","CEDAZURIDINE","PARSACLISIB","DUVELISIB","COPANLISIB","UMBRALISIB",
+    "IDELALISIB","ALPELISIB","INFIGRATINIB","PEMIGATINIB","ERDAFITINIB","FGFR",
+    "SELINEXOR","TAZEMETOSTAT","NAVITOCLAX",
+    "EPOPROSTENOL","TREPROSTINIL","ILOPROST","SELEXIPAG","RIOCIGUAT","VERICIGUAT","LEVOSIMENDAN",
+    "DRONEDARONE","FLECAINIDE","PROPAFENONE",
+    "ATOGEPANT","UBROGEPANT","RIMEGEPANT","ZAVEGEPANT","LASMIDITAN",
+    "BEROTRALSTAT","LANADELUMAB","ICATIBANT","RILONACEPT",
+    "PATISIRAN","INCLISIRAN",
+    "ALBIGLUTIDE","TIRZEPATIDE",
+    "OBETICHOLIC","ELUXADOLINE","PLECANATIDE","LINACLOTIDE","LUBIPROSTONE",
+    "ETRASIMOD","OZANIMOD","PONESIMOD","SIPONIMOD","SATRALIZUMAB","INEBILIZUMAB","FENEBRUTINIB",
+    "DOSTARLIMAB","CEMIPLIMAB","CAMRELIZUMAB","SINTILIMAB","TREMELIMUMAB","RELATLIMAB",
+    "FRUQUINTINIB","TIVOZANIB","RIPRETINIB","AVAPRITINIB","PEXIDARTINIB","QUIZARTINIB",
+    "SELPERCATINIB","PRALSETINIB","TEPOTINIB","CAPMATINIB","SAVOLITINIB",
+    "OLUTASIDENIB","ENASIDENIB","IVOSIDENIB","GILTERITINIB","MIDOSTAURINE","GLASDEGIB",
+    "TAGRAXOFUSP","ASCIMINIB","FEDRATINIB","PACRITINIB","RUXOLITINIB","MOMELOTINIB",
+    "ENTRECTINIB","LAROTRECTINIB","SELUMETINIB","ADAGRASIB","SOTORASIB",
+    "ZANUBRUTINIB","ORELABRUTINIB","TIRABRUTINIB","ACALABRUTINIB",
+    "VENETOCLAX","INAVOLISIB","UMBRALISIB","DUVELISIB","COPANLISIB","PARSACLISIB",
+    "NELARABINE","PENTOSTATIN","CLOFARABINE","FLUDARABINE","CLADRIBINE","MELPHALAN","BUSULFAN",
+    "TREOSULFAN","LOMUSTINE","CARMUSTINE","DACARBAZINE","PROCARBAZINE","ESTRAMUSTINE",
+    "PIXANTRONE","IDARUBICINE","DACTINOMYCINE","BLEOMYCINE","MITOMYCINE","MITOXANTRONE",
+    "CABAZITAXEL","ERIBULINE","IXABEPILONE",
+    "ETELCALCETIDE","CINACALCET","PARATHYROID","DENOSUMAB","ROMOSOZUMAB","ABALOPARATIDE",
+    "RISDIPLAM","NUSINERSEN","TOFERSEN","EDARAVONE","RILUZOLE",
+    "CAPLACIZUMAB","EMICIZUMAB","ROMIPLOSTIM","ELTROMBOPAG","AVATROMBOPAG","LUSUTROMBOPAG",
+    "UBLITUXIMAB","OFATUMUMAB","OCRELIZUMAB","NATALIZUMAB","ALEMTUZUMAB","OLARATUMAB",
+  ]);
+
+  function getDifficulty(dci) {
+    if (ALWAYS_EASY.has(dci)) return 0;  // facile
+    if (ALWAYS_HARD.has(dci)) return 2;  // difficile
+
+    const meta = DCI_META[dci];
+    const atc = meta?.atc || "";
+    const len = dci.length;
+    const lower = dci.toLowerCase();
+
+    // V10 = médecine nucléaire radioimmuno → difficile
+    if (atc === "V10") return 2;
+
+    // L01 + nom long → difficile (ITK de nouvelle génération, etc.)
+    if (atc === "L01" && len >= 12) return 2;
+    // L04 + très long → difficile
+    if (atc === "L04" && len >= 14) return 2;
+    // Très long ET spécialisé
+    if (len >= 15 && ["L01","L02","L03","L04","V03","B06","A16","M09","R07"].some(a => atc.startsWith(a))) return 2;
+
+    // Suffixes de thérapies ciblées récentes → difficile si ATC spécialisé
+    const hardSuffix = ["tinib","rafenib","lisib","ciclib","tanib","zumab","ximab","lumab","mumab","dumab","prazib","tasvir","previr","asvir"].some(s => lower.endsWith(s));
+    if (hardSuffix && len >= 11 && ["L01","L04","L03","J05"].some(a => atc.startsWith(a))) return 2;
+
+    // Easy ATC codes (médecine générale courante)
+    const easyAtcPrefixes = [
+      "N02","A02","A03","A04","A06","A07","A08","A10","A11","A12",
+      "B01","B03","C01","C03","C07","C08","C09","C10",
+      "D01","G03","G04","H02","H03","H04",
+      "J01","M01","M03","M04",
+      "N01","N03","N04","N05","N06","N07",
+      "R01","R03","R05","R06","S01"
+    ];
+    const isEasyAtc = easyAtcPrefixes.some(p => atc === p || atc.startsWith(p + "."));
+    if (isEasyAtc && len <= 13) return 0; // facile
+
+    return 1; // moyen par défaut
+  }
+
+  // Construire les 3 pools au démarrage
+  let WORDS_FACILE = [];
+  let WORDS_MOYEN = [];
+  let WORDS_DIFFICILE = [];
+
+  function buildWordPools(){
+    const sortedAll = DCI_WORDS.slice().sort();
+    WORDS_FACILE    = sortedAll.filter(w => getDifficulty(w) === 0);
+    WORDS_MOYEN     = sortedAll.filter(w => getDifficulty(w) === 1);
+    WORDS_DIFFICILE = sortedAll.filter(w => getDifficulty(w) === 2);
+  }
+
+  function pickTargetForLevel(level){
     const dateKey = todayDateString();
-    const idx = hashString(dateKey) % sortedWords.length;
-    return sortedWords[idx];
+    const seed = { facile: "_f", moyen: "_m", difficile: "_d" }[level] || "_f";
+    const pool = level === "facile" ? WORDS_FACILE
+               : level === "difficile" ? WORDS_DIFFICILE
+               : WORDS_MOYEN;
+    if (!pool.length) return DCI_WORDS[hashString(dateKey) % DCI_WORDS.length];
+    return pool[hashString(dateKey + seed) % pool.length];
+  }
+
+  // Niveau courant (persisté)
+  const LEVEL_KEY = "pharmasutom_level_v1";
+  let currentLevel = (() => {
+    try { return localStorage.getItem(LEVEL_KEY) || "facile"; } catch(e) { return "facile"; }
+  })();
+
+  function saveCurrentLevel(level){
+    try { localStorage.setItem(LEVEL_KEY, level); } catch(e){}
+  }
+
+  function pickTarget(){
+    return pickTargetForLevel(currentLevel);
   }
 
   function normalize(str){
@@ -1168,6 +1395,7 @@ footer.app-footer{
       won: state.won,
       attempts: state.attempts.length,
       hintsUsed: state.hintsRevealed,
+      niveau: currentLevel || "facile",
     });
     saveHistory(list);
   }
@@ -1239,11 +1467,13 @@ footer.app-footer{
 
     const rows = history.slice().reverse().map(g => {
       const d = new Date(g.date);
+      const niveauLabel = {facile:"🟢 Facile", moyen:"🟡 Moyen", difficile:"🔴 Difficile"}[g.niveau] || (g.niveau || "—");
       return `<tr>
         <td>${d.toLocaleDateString("fr-FR")}</td>
         <td class="mono">${g.target}</td>
         <td>${g.famille || "—"}</td>
         <td class="mono">${g.atc || "—"}</td>
+        <td>${niveauLabel}</td>
         <td>${g.won ? "✓ " + g.attempts + "/6" : "✗"}</td>
         <td>${g.hintsUsed || 0}</td>
       </tr>`;
@@ -1347,7 +1577,7 @@ svg{ width:100%; height:160px; display:block; }
   <div class="card">
     <h2>Historique détaillé</h2>
     ${played ? `<table>
-      <thead><tr><th>Date</th><th>DCI</th><th>Famille</th><th>ATC</th><th>Résultat</th><th>Indices</th></tr></thead>
+      <thead><tr><th>Date</th><th>DCI</th><th>Famille</th><th>ATC</th><th>Niveau</th><th>Résultat</th><th>Indices</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>` : '<p class="empty">Pas encore de données.</p>'}
   </div>
@@ -1373,13 +1603,13 @@ svg{ width:100%; height:160px; display:block; }
   // ---------- Progression du jour (persistance) ----------
   function loadProgress(){
     try{
-      const raw = localStorage.getItem(PROGRESS_KEY);
+      const raw = localStorage.getItem(getProgressKey(currentLevel));
       return raw ? JSON.parse(raw) : null;
     }catch(e){ return null; }
   }
   function saveProgress(){
     try{
-      localStorage.setItem(PROGRESS_KEY, JSON.stringify({
+      localStorage.setItem(getProgressKey(currentLevel), JSON.stringify({
         date: todayDateString(),
         target: state.target,
         attempts: state.attempts,
@@ -1450,10 +1680,12 @@ svg{ width:100%; height:160px; display:block; }
     if(state.finished){
       finishGame(true);
     }else{
-      showMessage("DCI du jour — première lettre déjà révélée sur le plateau.");
+      const lvlLabel = {facile:"🟢 Facile", moyen:"🟡 Moyen", difficile:"🔴 Difficile"}[currentLevel] || "";
+      showMessage(`DCI du jour (${lvlLabel}) — première lettre déjà révélée sur le plateau.`);
     }
     refreshHintsUI();
     renderStatsStrip();
+    updateLevelUI();
     if(!state.finished){
       inputEl.value = state.target[0] || "";
       inputEl.focus();
@@ -1503,10 +1735,42 @@ svg{ width:100%; height:160px; display:block; }
     });
   }
 
+  // ---------- Mise à jour du badge de niveau ----------
+  function updateLevelUI(){
+    // Badge dans le header
+    const badge = document.getElementById("levelBadge");
+    if(badge){
+      const labels = {facile:"Facile", moyen:"Moyen", difficile:"Difficile"};
+      badge.textContent = labels[currentLevel] || "Facile";
+      badge.className = "level-badge " + (currentLevel !== "facile" ? currentLevel : "");
+    }
+    // Boutons de sélection
+    document.querySelectorAll(".lvl-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.level === currentLevel);
+    });
+    // Dosage-tag : longueur du mot
+    const tag = document.getElementById("lengthTag");
+    if(tag && state.length) tag.textContent = state.length + " lettre" + (state.length > 1 ? "s" : "");
+  }
+
+  // ---------- Sélecteur de niveau ----------
+  document.querySelectorAll(".lvl-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const newLevel = btn.dataset.level;
+      if(newLevel === currentLevel) return;
+      currentLevel = newLevel;
+      saveCurrentLevel(currentLevel);
+      updateLevelUI();
+      startTodayGame();
+    });
+  });
+
   // ---------- Initialisation ----------
   async function init(){
     renderDateTag();
     await loadDictionary();
+    buildWordPools();
+    updateLevelUI();
     startTodayGame();
     showTutorialIfNeeded();
   }
